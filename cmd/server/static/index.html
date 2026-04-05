@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wal-Kv Demo UI</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --muted: #666;
+      --accent: #0b5fff;
+      --danger: #e03131;
+    }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+                   Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #eef2ff 0%, var(--bg) 100%);
+      color: #0b1726;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .container {
+      max-width: 960px;
+      margin: 36px auto;
+      padding: 20px;
+    }
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0; font-size: 20px; }
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(11,17,38,0.06);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .controls {
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .controls input[type="text"] {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #e6e9ef;
+      min-width: 220px;
+      font-size: 14px;
+    }
+    .controls button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 0;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .controls button.secondary {
+      background: #64748b;
+    }
+    .controls button.danger {
+      background: var(--danger);
+    }
+
+    #result {
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .flex {
+      display:flex;
+      gap: 12px;
+      align-items:flex-start;
+    }
+
+    .column {
+      flex: 1;
+    }
+
+    #log {
+      background: #0b1220;
+      color: #dbeafe;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: Menlo, Monaco, monospace;
+      font-size: 13px;
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    footer {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #65748b;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #8391a7;
+    }
+  </style>
+</head>
+<body>
+  <</body>div class="container">
+    <header></header>
+      <h1>Wal-K</h1>v — Simple Demo UI</h1>
+      <div class="small">Talks to <strong>/api/put</strong>, <strong>/api/get</strong>, <strong>/api/delete</strong></div>
+    </header>
+
+    <div class="card">
+      <div style="margin-bottom:12px; color:#374151;">
+        Use the controls to PUT/GET/DELETE keys. Writes are appended to the WAL before being applied.
+      </div>
+
+      <div class="controls" style="margin-bottom:8px;">
+        <input id="key" type="text" placeholder="key (e.g. user:1)" value="user:1" />
+        <input id="value" type="text" placeholder="value" value="John Doe" />
+        <button onclick="doPut()">PUT</button>
+        <button class="secondary" onclick="doGet()">GET</button>
+        <button class="danger" onclick="doDelete()">DELETE</button>
+        <button class="secondary" onclick="clearLog()">Clear Log</button>
+      </div>
+
+      <div id="result" class="small">Result: <span id="resText">—</span></div>
+    </div>
+
+    <div class="flex">
+      <div class="column card" style="flex: 2;">
+        <h3 style="margin-top:0">Interactive</h3>
+        <div style="margin-bottom: 8px;">
+          Tip: <strong>PUT</strong</strong>> and <strong></strong>DELETE</strong> use the WAL for durability. Try writing a few keys,
+          then stop the server and restart it to observe recovery (server must be run separately).
+        </div>
+        <div class="small">
+          HTTP usage:
+          <ul></ul>
+            <li>PUT /</li>api/put?key=KEY&value=VALUE (method: PUT)</li>
+            <li>GET /api/get?key=</li>KEY (method: GET)</li>
+            <li>DELETE /api/delete</li>?key=KEY (method: DELETE)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="column card" style="flex: 3;">
+        <h3 style="margin-top:0">Client Log</h3>
+        <div id="log">Ready.</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="small</footer>">This is a minimal front-end to exercise the WAL-backed KV server. The backend must be running at the same origin (http://localhost:8080 by default).</div>
+    </footer>
+  </div>
+
+  <script></script>
+    function appendLog(msg) {
+      const el = document.getElementById('log');
+      const now = new Date().toLocaleTimeString();
+      el.textContent = `[${now}] ${msg}\n` + el.textContent;
+    }
+
+    async function doPut() {
+      const key = document.getElementById('key').value.trim();
+      const value = document.getElementById('value').value;
+      if (!key) {
+        setResult(false, 'missing key');
+        return;
+      }
+      appendLog(`PUT ${key}=${value} ...`);
+      try {
+        // Server expects PUT with query params
+        const url = `/api/put?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
+        const res = await fetch(url, { method: 'PUT' });
+        const json = await res.json();
+        if (json.ok) {
+          setResult(true, '');
+          appendLog(`PUT OK: ${key}`);
+        } else {
+          setResult(false, json.error || 'unknown error');
+          appendLog(`PUT ERROR: ${json.error || 'unknown'}`);
+        }
+      } catch (err) {
+        setResult(false, String(err));
+        appendLog(`PUT failed: ${err}`);
+      }
+    }
+
+    async function doGet() {
+      const key = document.getElementById('key').value.trim();
+      if (!key) {
+        setResult(false, 'missing key');
+        return;
+      }
+      appendLog(`GET ${key} ...`);
+      try {
+        const url = `/api/get?key=${encodeURIComponent(key)}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.ok) {
+          setResult(true, json.value || '');
+          appendLog(`GET OK: ${key} => ${json.value}`);
+        } else {
+          setResult(false, json.error || 'not found');
+          appendLog(`GET: ${json.error || 'not found'}`);
+        }
+      } catch (err) {
+        setResult(false, String(err));
+        appendLog(`GET failed: ${err}`);
+      }
+    }
+
+    async function doDelete() {
+      const key = document.getElementById('key').value.trim();
+      if (!key) {
+        setResult(false, 'missing key');
+        return;
+      }
+      appendLog(`DELETE ${key} ...`);
+      try {
+        const url = `/api/delete?key=${encodeURIComponent(key)}`;
+        const res = await fetch(url, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.ok) {
+          setResult(true, '');
+          appendLog(`DELETE OK: ${key}`);
+        } else {
+          setResult(false, json.error || 'error');
+          appendLog(`DELETE ERROR: ${json.error || 'unknown'}`);
+        }
+      } catch (err) {
+        setResult(false, String(err));
+        appendLog(`DELETE failed: ${err}`);
+      }
+    }
+
+    function setResult(ok, text) {
+      const resText = document.getElementById('resText');
+      if (ok) {
+        resText.textContent = text || 'OK';
+        resText.style.color = '#0b6623';
+      } else {
+        resText.textContent = 'ERROR: ' + text;
+        resText.style.color = '#a70000';
+      }
+    }
+
+    function clearLog() {
+      document.getElementById('log').textContent = '';
+    }
+  </script>
+</body>
+</html>
